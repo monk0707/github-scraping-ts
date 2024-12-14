@@ -98,7 +98,7 @@ const App = () => {
 
   const updateDataSocialMediaUrls = async (resFromSocialMediaUrls: FetchResult[]) => {
     console.log('resFromSocialMediaUrls is :', resFromSocialMediaUrls);
-    if (resFromSocialMediaUrls.valueOf.length === 0) {
+    if (resFromSocialMediaUrls.length === 0) {
       console.log('No data from social media urls');
       return;
     } else {
@@ -121,12 +121,12 @@ const App = () => {
       console.log('Response from backend:', response.data.otherUrls);
 
       const resFromOtherUrls = response.data.otherUrls;
-      const resFromSocialMediaUrls = response.data.socialMediaUrls;
+      // const resFromSocialMediaUrls = response.data.socialMediaUrls;
 
       alert('Data sent successfully');
 
       updateDataOtherUrls(resFromOtherUrls);
-      updateDataSocialMediaUrls(resFromSocialMediaUrls);
+      // updateDataSocialMediaUrls(resFromSocialMediaUrls);
 
     } catch (err) {
       if (err instanceof Error) {
@@ -138,12 +138,44 @@ const App = () => {
     }
   };
 
+
+
+  const sendDataToSelenium = async () => {
+    try {
+      const unfetchedUrls = data.map(item => ({ content: "", url: item.url, status: item.status, statusText: item.statusText }));
+
+      console.log('sending data to selenium still in frontend');
+
+      const response = await axios.post('http://localhost:3001/scrapeSelenium', { results: unfetchedUrls });
+      console.log('Response from backend:', response.data.otherUrls);
+
+      const resFromOtherUrls = response.data.otherUrls;
+  // const resFromSocialMediaUrls = response.data.socialMediaUrls;
+
+      alert('Data sent successfully');
+
+      updateDataOtherUrls(resFromOtherUrls);
+      // updateDataSocialMediaUrls(resFromSocialMediaUrls);
+
+    } catch (err) {
+      if (err instanceof Error) {
+        alert('Failed to send data');
+        console.log('Failed to send data', err);
+      }
+      else {
+        alert('Failed to send data');
+        console.log('Failed to send data', err);
+      }
+    }
+  };
+
   return (
     <div>
       <h1>Fetched Data</h1>
       <pre>{JSON.stringify(data.map(entry => ({ ...entry, content: undefined })), null, 2)}</pre>
       <button onClick={fetchDataFromFrontend}>Reiterate from frontend</button>
       <button onClick={sendDataToBackend}>Send Data to Backend</button>
+      <button onClick={sendDataToSelenium}>Send Data to Selenium</button>
     </div>
   );
 };
