@@ -146,8 +146,9 @@ const App = () => {
 
       console.log('sending data to selenium still in frontend');
 
-      const response = await axios.post('http://localhost:3001/scrapeSelenium', { results: unfetchedUrls });
-      console.log('Response from backend:', response.data.otherUrls);
+      const res = await fetch('http://localhost:3001/scrapeSelenium', { body: JSON.stringify({ results: unfetchedUrls }) });
+      const response = await res.json();
+      console.log('Response from backend:', response.otherUrls);
 
       const resFromOtherUrls = response.data.otherUrls;
   // const resFromSocialMediaUrls = response.data.socialMediaUrls;

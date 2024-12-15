@@ -18,6 +18,11 @@ dotenv.config();
 const app = express();
 const port:number = parseInt(process.env.PORT || '3001',10);
 
+
+app.use(cors({
+    origin: 'http://localhost:3000', // Replace with your frontend's URL
+}));
+
 // app.use(cors({
 //     origin: 'http://localhost:3000', // Your frontend URL
 //     methods: ['GET', 'POST']
@@ -618,7 +623,7 @@ app.post("/augment", (req: Request, res : Response) => {
 });
 
 // app.post('/scrapeSelenium', (req: Request, res: Response) => {
-//     // what to do now : 
+//     // what to do now :
 
 //     const body: { results: FetchResult[] } = req.body;
 
@@ -630,7 +635,7 @@ app.post("/augment", (req: Request, res : Response) => {
 //         return result.status !== 200;
 //     });
 
-//     // so I got the urls which are not fetched. Now write a function to fetch these urls 
+//     // so I got the urls which are not fetched. Now write a function to fetch these urls
 
 //     interface seleniumResults {
 //         seleniumResponses: FetchResult[],
@@ -656,78 +661,56 @@ app.post("/augment", (req: Request, res : Response) => {
 
 
 // selenium scraping with worker thread
-
 app.post('/scrapeSelenium', (req: Request, res: Response) => {
+    console.log("Request received");
     const body: { results: FetchResult[] } = req.body;
 
-    console.log("The URLs are with fetched data:", body);
+    const urlsNotFetched = body.results.filter(result => result.status !== 200);
 
-    const urlsNotFetched = body.results.filter(result => {
-        return result.status !== 200;
+    const worker = new Worker('./src/seleniumWorker.ts', {
+        workerData: {
+            urlsToScrape: urlsNotFetched.map(result => result.url),
+            proxyList: process.env.PROXY_LIST ? process.env.PROXY_LIST.split(',') : [],
+        },
     });
 
-    // Prepare the data for the worker
-    console.log('before preparing data for worker');
-    const workerData = {
-        urlsToScrape: urlsNotFetched.map(result => result.url),
-        proxyList: process.env.PROXY_LIST ? process.env.PROXY_LIST.split(',') : [],
-    };
+    let responseSent = false; // Flag to prevent multiple responses
 
-    console.log('after preparing data for worker');
-
-    // Create a new worker and pass the workerData
-    const worker = new Worker('./seleniumWorker.ts', {
-        workerData,
-    });
-
-    console.log('worker is ', worker)
-
-    console.log('after creating worker');
-
-    // Handle the result from the worker
-    worker.on('message', (message) => {
-        console.log('inside message');
-        if (message.status === 'success') {
-            // Send the successful result back to the client
-            console.log('hello');
+    // Listen for a successful message from the worker
+    worker.on('message', (response: any) => {
+        if (!responseSent) {
+            responseSent = true; // Mark response as sent
             res.json({
-                message: 'successful',
-                seleniumResponses: message.response.seleniumResponses,
+                message: "successful",
+                otherUrls: response.seleniumResponses,
                 urlsNotFetched,
             });
-        } else if (message.status === 'error') {
-            // Handle the error
-            console.log('hi');
+        }
+    });
+
+    // Handle worker errors
+    worker.on('error', (error: any) => {
+        if (!responseSent) {
+            responseSent = true; // Mark response as sent
             res.status(500).json({
-                message: 'unsuccessful',
-                error: message.error,
+                message: "unsuccessful",
+                error,
             });
         }
     });
 
-    console.log('after handling message');
-
-    // Handle any errors from the worker
-    worker.on('error', (error) => {
-        res.status(500).json({
-            message: 'unsuccessful',
-            error: error.message,
-        });
-    });
-
-    console.log('after handling error');
-
-    // Handle when the worker finishes
+    // Ensure a response is sent if the worker exits unexpectedly
     worker.on('exit', (code) => {
-        if (code !== 0) {
-            res.status(500).json({
-                message: 'unsuccessful',
-                error: 'Worker thread exited with code ' + code,
-            });
+        if (!responseSent) {
+            responseSent = true; // Mark response as sent
+            if (code !== 0) {
+                res.status(500).json({
+                    message: "Worker thread terminated unexpectedly",
+                    code,
+                });
+            }
         }
     });
-
-    console.log('after handling exit');
 });
 
 // app.get('/alchemyst-ai/scrape',scrapeUrls);
